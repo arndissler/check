@@ -1,0 +1,79 @@
+#!/usr/bin/osascript
+
+on run argv
+    set needHelp to false
+
+    set list to system attribute "CHECK_LIST"
+    log "use list: "
+    log list
+    return
+
+    if length of argv < 3 or item 2 in argv = "--help" then
+        set needHelp to true
+    end if
+
+    if needHelp = true then
+        log "Usage: check \"something\" [in|at] [HH:MM|<value> <unit>]"
+        log ""
+        log "Examples:"
+        log ""
+        log "  check https://your.ci/path/to/code/review in 5 minutes"
+        log ""
+        log "      Will remind you in 5 minutes to open the given URL. Default unit is 'minutes', so you can omit it if you want to set up a reminder in X minutes."
+        log ""
+        log ""
+        log "  check \"Remind me\" at 11:30"
+        log ""
+        log "      Will remind you on the same day when it's before 11:30am or on the next day at 11:30am, when it's later than the given time."
+        log ""
+        log ""
+        return
+    end if
+
+    tell application "Reminders"
+        tell list "Code Reviews"
+            set reminderURL to ""
+            set reminderBody to ""
+            set reminderName to ""
+            set remindAt to current date
+            set reminderName to item 1 of argv
+            
+            if item 2 of argv = "in" then
+                set value to item 3 of argv
+                set unitString to item 4 of argv
+                set unit to 60
+                if (offset of "m" in unitString) = 1 then
+                    set unit to 60
+                else if (offset of "h" in unitString) = 1 then
+                    set unit to 1 * 60 * 60
+                else if (offset of "d" in unitString) = 1 then
+                    set unit to 1 * 60 * 60 * 24
+                end if
+                set remindAt to remindAt + (value * unit)
+            else if item 2 of argv = "at" then
+                set timeString to item 3 of argv
+                if (offset of ":" in timeString) > 0 then
+                    set oldDelimiters to AppleScript's text item delimiters
+                    set AppleScript's text item delimiters to ":"
+                    set remindAtHour to text item 1 of timeString
+                    set remindAtMinute to text item 2 of timeString
+                    
+                    set currentDay to (current date) - (time of (current date))
+                    set timeString to time string of (current date)
+                    set currentHour to text item 1 of timeString
+                    set currentMinute to item 2 of timeString
+                    set AppleScript's text item delimiters to oldDelimiters
+                    
+                    if (currentHour > remindAtHour) or (currentHour = remindAtHour and currentMinute > remindAtMinute) then
+                        set remindAtHour to (remindAtHour + 24)
+                    end if
+                    
+                    set remindAt to currentDay + remindAtHour * 60 * 60 + remindAtMinute * 60
+                end if
+            end if
+
+            make new reminder with properties {name:reminderName, body:reminderBody, remind me date:remindAt}
+
+        end tell
+    end tell
+end run
